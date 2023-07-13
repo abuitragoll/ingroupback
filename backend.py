@@ -12,7 +12,7 @@ def post_user():
     preferences = data.get('preferences', [])
     affiliate = data.get('affiliate')
     
-    if preferences and (len(preferences) % 2 != 0 or len(set(preferences)) != len(preferences)):
+    if preferences and (len(preferences) == 0 or len(preferences) % 2 == 1 or len(set(preferences)) != len(preferences)):
         return jsonify({'error': 'Invalid preferences'}), 400
     
     payload = {
