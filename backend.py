@@ -12,7 +12,7 @@ url = "postgres://admin:xqfZ2Mg2xG4rCwnXS473zCQElTcAVnUp@dpg-cip417d9aq0dcpvmlkd
 result = urlparse(url)
 
 # Obtener los componentes de la URL
-user = result.username
+db_user = result.username
 password = result.password
 host = result.hostname
 port = result.port
@@ -51,7 +51,7 @@ def post_user():
             host=host,
             port=port,
             database=database,
-            user=user,
+            user=db_user,
             password=password
         )
 
@@ -125,7 +125,7 @@ def get_users():
         host=host,
         port=port,
         database=database,
-        user=user,
+        user=db_user,
         password=password
     )
     
