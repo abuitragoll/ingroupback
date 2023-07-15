@@ -1,7 +1,29 @@
 import requests
 from flask import Flask, jsonify, request
+import psycopg2
+from urllib.parse import urlparse
 
 app = Flask(__name__)
+
+# Parsear la URL de conexión
+url = "postgres://admin:xqfZ2Mg2xG4rCwnXS473zCQElTcAVnUp@dpg-cip417d9aq0dcpvmlkdg-a.frankfurt-postgres.render.com/ingroup"
+result = urlparse(url)
+
+# Obtener los componentes de la URL
+user = result.username
+password = result.password
+host = result.hostname
+port = result.port
+database = result.path.lstrip("/")
+
+# Establecer la conexión
+conn = psycopg2.connect(
+    host=host,
+    port=port,
+    database=database,
+    user=user,
+    password=password
+)
 
 @app.route('/users', methods=['POST'])
 def post_user():
@@ -34,21 +56,16 @@ def post_user():
     
 @app.route('/users', methods=['GET'])
 def get_users():
-    users = [
-        {
-            'name': 'Raul',
-            'email': 'test@company.com',
-            'preferences': ['water', 'coffee'],
-            'affiliate': True
-        },
-        {
-            'name': 'Marino',
-            'email': 'test2@company.com',
-            'preferences': [],
-            'affiliate': True
-        }
-    ]
-    return jsonify(users)
+    cur = conn.cursor()
+
+    cur.execute('SELECT * FROM users')
+
+    results = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify(results)
 
 if __name__ == '__main__':
     app.run()
