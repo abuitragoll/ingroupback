@@ -33,25 +33,87 @@ def post_user():
     email = data.get('email')
     preferences = data.get('preferences', [])
     affiliate = data.get('affiliate')
+
+    if preferences:
+        even_count = sum(1 for pref in preferences if pref % 2 == 0)
+        odd_count = sum(1 for pref in preferences if pref % 2 != 0)
+
+        if even_count == 0 or odd_count == 0:
+            return jsonify({'error': 'Debe haber al menos una preferencia par y una preferencia impar'}), 400
+        
+        if len(set(preferences)) != len(preferences):
+            return jsonify({'error': 'No se permiten preferencias repetidas'}), 400
     
-    if preferences and (len(preferences) == 0 or len(preferences) % 2 == 1 or len(set(preferences)) != len(preferences)):
-        return jsonify({'error': 'Invalid preferences'}), 400
-    
-    payload = {
-        'name': name,
-        'email': email,
-        'preferences': preferences,
-        'affiliate': affiliate
-    }
-    
-    response = requests.post('https://invelonjobinterview.herokuapp.com/api/post_test', json=payload)
+    response = requests.get('https://ingroupback.onrender.com/users')
     
     if response.status_code == 200:
-        return jsonify(response.json())
-    elif response.status_code == 409:
-        return jsonify({'error': 'Duplicated user'}), 409
+        result = response.json()
+        users = result['users']
+        for user in users:
+            if user['name'] == name or user['email'] == email:
+                return jsonify({'error': 'Usuario duplicado'}), 400
+
+        cur = conn.cursor()
+
+        # Recuperamos las preferencias para verificar si alguna de ellas no existe y luego insertarla en la base de datos si es necesario.
+        cur.execute('''
+            SELECT *
+            FROM preferences
+        ''')
+
+        result_preferences = cur.fetchall()
+
+        existing_ids = []
+        for pref in result_preferences:
+            existing_ids.append(pref[0])
+
+        missing_ids = []
+        for pref in preferences:
+            if pref not in existing_ids:
+                missing_ids.append(pref)
+
+
+        for preference_id in missing_ids:
+            query = "INSERT INTO preferences (id, preference) VALUES (%s, %s)"
+            values = (preference_id, preference_id)
+            cur.execute(query, values)
+            conn.commit()
+            result_preferences.append([preference_id, preference_id])
+
+        # A continuación, realizamos la inserción del usuario en caso de que no exista en la base de datos.
+        query = "INSERT INTO users (name, email, affiliate) VALUES (%s, %s, %s)"
+        values = (name, email, affiliate)
+        cur.execute(query, values)
+
+        conn.commit()
+
+        cur.execute('SELECT LASTVAL()')
+        user_id = cur.fetchone()[0]
+        
+
+        # Por último, insertamos las preferencias del usuario en la base de datos.
+        for pref in preferences:
+            query = "INSERT INTO users_preferences(id_user, id_preference) VALUES (%s, %s)"
+            values = (user_id, pref)
+            cur.execute(query, values)
+            conn.commit()
+
+        name_preferences = []
+        for pref in result_preferences:
+            if pref[0] in preferences:
+                name_preferences.append(pref[1])
+
+        cur.close()
+
+        return {
+            'name': name,
+            'email': email,
+            'preferences': name_preferences,
+            'affiliate': affiliate
+        }
+
     else:
-        return jsonify({'error': 'Unexpected error from test server'}), 500
+        return jsonify({'error': 'Error inesperado del servidor de pruebas'}), 500
 
     
 @app.route('/users', methods=['GET'])
