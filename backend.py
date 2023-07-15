@@ -18,15 +18,6 @@ host = result.hostname
 port = result.port
 database = result.path.lstrip("/")
 
-# Establecer la conexión
-conn = psycopg2.connect(
-    host=host,
-    port=port,
-    database=database,
-    user=user,
-    password=password
-)
-
 @app.route('/users', methods=['POST'])
 def post_user():
     data = request.get_json()
@@ -54,6 +45,15 @@ def post_user():
         for user in users:
             if user['name'] == name or user['email'] == email:
                 return jsonify({'error': 'Usuario duplicado'}), 400
+            
+        # Establecer la conexión
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            database=database,
+            user=user,
+            password=password
+        )
 
         cur = conn.cursor()
 
@@ -105,7 +105,7 @@ def post_user():
             if pref[0] in preferences:
                 name_preferences.append(pref[1])
 
-        cur.close()
+        conn.close()
 
         return {
             'name': name,
@@ -120,6 +120,15 @@ def post_user():
     
 @app.route('/users', methods=['GET'])
 def get_users():
+    # Establecer la conexión
+    conn = psycopg2.connect(
+        host=host,
+        port=port,
+        database=database,
+        user=user,
+        password=password
+    )
+    
     cur = conn.cursor()
 
     cur.execute('''
@@ -143,6 +152,8 @@ def get_users():
             'affiliate': result[2]
         }
         users.append(user)
+    
+    conn.close()
 
     return jsonify({'users': users})
 
