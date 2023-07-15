@@ -58,14 +58,30 @@ def post_user():
 def get_users():
     cur = conn.cursor()
 
-    cur.execute('SELECT * FROM users')
+    cur.execute('''
+        SELECT u.name, u.email, u.affiliate, STRING_TO_ARRAY(STRING_AGG(p.preference, ','), ',') AS preferences
+        FROM users u
+        LEFT JOIN users_preferences up ON up.id_user = u.id
+        LEFT JOIN preferences p ON up.id_preference = p.id
+        GROUP BY u.id, u.name, u.email, u.affiliate
+    ''')
 
     results = cur.fetchall()
 
     cur.close()
     conn.close()
 
-    return jsonify(results)
+    users = []
+    for result in results:
+        user = {
+            'name': result[0],
+            'email': result[1],
+            'preferences': result[3],
+            'affiliate': result[2]
+        }
+        users.append(user)
+
+    return jsonify({'users': users})
 
 if __name__ == '__main__':
     app.run()
