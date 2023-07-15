@@ -69,7 +69,6 @@ def get_users():
     results = cur.fetchall()
 
     cur.close()
-    conn.close()
 
     users = []
     for result in results:
