@@ -1,9 +1,11 @@
 import requests
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import psycopg2
 from urllib.parse import urlparse
 
 app = Flask(__name__)
+CORS(app, resources={r"/users": {"origins": "https://ingroupfront.onrender.com"}})
 
 # Parsear la URL de conexión
 url = "postgres://admin:xqfZ2Mg2xG4rCwnXS473zCQElTcAVnUp@dpg-cip417d9aq0dcpvmlkdg-a.frankfurt-postgres.render.com/ingroup"
