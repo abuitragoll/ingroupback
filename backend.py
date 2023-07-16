@@ -37,89 +37,94 @@ def post_user():
         if len(set(preferences)) != len(preferences):
             return jsonify({'error': 'No se permiten preferencias repetidas'}), 400
     
-    response = requests.get('https://ingroupback.onrender.com/users')
-    
-    if response.status_code == 200:
-        result = response.json()
-        users = result['users']
-        for user in users:
-            if user['name'] == name or user['email'] == email:
-                return jsonify({'error': 'Usuario duplicado'}), 400
-            
-        # Establecer la conexión
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            database=database,
-            user=db_user,
-            password=password
-        )
+    users = get_users_db()
 
-        cur = conn.cursor()
+    for user in users:
+        if user['name'] == name or user['email'] == email:
+            print('El usuario existe')
+            return jsonify({'error': 'Usuario duplicado'}), 400
+        
+    # Establecer la conexión
+    conn = psycopg2.connect(
+        host=host,
+        port=port,
+        database=database,
+        user=db_user,
+        password=password
+    )
 
-        # Recuperamos las preferencias para verificar si alguna de ellas no existe y luego insertarla en la base de datos si es necesario.
-        cur.execute('''
-            SELECT *
-            FROM preferences
-        ''')
+    cur = conn.cursor()
 
-        result_preferences = cur.fetchall()
+    # Recuperamos las preferencias para verificar si alguna de ellas no existe y luego insertarla en la base de datos si es necesario.
+    cur.execute('''
+        SELECT *
+        FROM preferences
+    ''')
 
-        existing_ids = []
-        for pref in result_preferences:
-            existing_ids.append(pref[0])
+    result_preferences = cur.fetchall()
 
-        missing_ids = []
-        for pref in preferences:
-            if pref not in existing_ids:
-                missing_ids.append(pref)
+    existing_ids = []
+    for pref in result_preferences:
+        existing_ids.append(pref[0])
+
+    missing_ids = []
+    for pref in preferences:
+        if pref not in existing_ids:
+            missing_ids.append(pref)
 
 
-        for preference_id in missing_ids:
-            query = "INSERT INTO preferences (id, preference) VALUES (%s, %s)"
-            values = (preference_id, preference_id)
-            cur.execute(query, values)
-            conn.commit()
-            result_preferences.append([preference_id, preference_id])
-
-        # A continuación, realizamos la inserción del usuario en caso de que no exista en la base de datos.
-        query = "INSERT INTO users (name, email, affiliate) VALUES (%s, %s, %s)"
-        values = (name, email, affiliate)
+    for preference_id in missing_ids:
+        query = "INSERT INTO preferences (id, preference) VALUES (%s, %s)"
+        values = (preference_id, preference_id)
         cur.execute(query, values)
+        conn.commit()
+        result_preferences.append([preference_id, preference_id])
+    
+    print('Preferencias creadas si no existen')
 
+    # A continuación, realizamos la inserción del usuario en caso de que no exista en la base de datos.
+    query = "INSERT INTO users (name, email, affiliate) VALUES (%s, %s, %s)"
+    values = (name, email, affiliate)
+    cur.execute(query, values)
+
+    conn.commit()
+
+    cur.execute('SELECT LASTVAL()')
+    user_id = cur.fetchone()[0]
+    
+    print('Usuario creado si no existen')
+
+
+    # Por último, insertamos las preferencias del usuario en la base de datos.
+    for pref in preferences:
+        query = "INSERT INTO users_preferences(id_user, id_preference) VALUES (%s, %s)"
+        values = (user_id, pref)
+        cur.execute(query, values)
         conn.commit()
 
-        cur.execute('SELECT LASTVAL()')
-        user_id = cur.fetchone()[0]
-        
+    print('Preferencias realacionadas con el Usuario')
 
-        # Por último, insertamos las preferencias del usuario en la base de datos.
-        for pref in preferences:
-            query = "INSERT INTO users_preferences(id_user, id_preference) VALUES (%s, %s)"
-            values = (user_id, pref)
-            cur.execute(query, values)
-            conn.commit()
+    name_preferences = []
+    for pref in result_preferences:
+        if pref[0] in preferences:
+            name_preferences.append(pref[1])
 
-        name_preferences = []
-        for pref in result_preferences:
-            if pref[0] in preferences:
-                name_preferences.append(pref[1])
+    conn.close()
 
-        conn.close()
-
-        return {
-            'name': name,
-            'email': email,
-            'preferences': name_preferences,
-            'affiliate': affiliate
-        }
-
-    else:
-        return jsonify({'error': 'Error inesperado del servidor de pruebas'}), 500
+    return {
+        'name': name,
+        'email': email,
+        'preferences': name_preferences,
+        'affiliate': affiliate
+    }
 
     
 @app.route('/users', methods=['GET'])
 def get_users():
+    users = get_users_db()
+    return jsonify({'users': users})
+
+def get_users_db():
     # Establecer la conexión
     conn = psycopg2.connect(
         host=host,
@@ -155,7 +160,7 @@ def get_users():
     
     conn.close()
 
-    return jsonify({'users': users})
+    return users
 
 if __name__ == '__main__':
     app.run()
